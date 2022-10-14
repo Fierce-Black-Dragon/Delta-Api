@@ -1,12 +1,19 @@
-import mongoose from "mongoose"
-import bcrypt  from "bcryptjs";
-import jwt, { Secret }  from "jsonwebtoken";
+import mongoose, { Schema, Document, InferSchemaType } from "mongoose";
+import bcrypt from "bcryptjs";
+import jwt, { Secret } from "jsonwebtoken";
 import { stringify } from "querystring";
 
-const acces_key  =process.env.JWT_ACCESS_KEY
-
-const refresh_key   =process.env.JWT_ACCESS_KEY
-const userSchema = new mongoose.Schema({
+// export interface IUser extends Document {
+//   name: string;
+//   email: string;
+//   username: string;
+//   password: string;
+//   confirmed: boolean;
+//   jwtAccessTokenCreation: () => string;
+//   checkPassword: (password: string) => boolean;
+//   jwtRefreshTokenCreation: () => string;
+// }
+const userSchema = new Schema({
   name: {
     type: String,
     required: true,
@@ -16,7 +23,6 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, "Please enter the email address"],
     unique: true,
-  
   },
   password: {
     type: String,
@@ -25,7 +31,6 @@ const userSchema = new mongoose.Schema({
     select: false,
   },
 
- 
   forgotPasswordToken: String,
   forgotTokenExpiry: Date,
   createdAt: {
@@ -46,16 +51,17 @@ userSchema.pre("save", async function (next) {
 });
 // Mongoose Methods
 //user password validate method
-userSchema.methods.isPasswordValid = async function (senderPassword :string)  {
-  return await bcrypt.compare(senderPassword, this.password);
+userSchema.methods.verifyPassword = async function (senderPassword: string) {
+  const isValid = await bcrypt.compare(senderPassword, this.password);
+  return isValid;
 };
 
 // jwt Access Token  creation
 userSchema.methods.jwtAccessTokenCreation = async function () {
-  let token =jwt.sign({ id: this._id }, process.env.JWT_ACCESS_KEY as Secret, {
+  let token = jwt.sign({ id: this._id }, process.env.JWT_ACCESS_KEY as Secret, {
     expiresIn: process.env.JWT_ACCESS_EXPIRE,
   });
-  return token
+  return token;
 };
 // jwt tRefresh Token  creation
 userSchema.methods.jwtRefreshTokenCreation = async function () {
@@ -93,5 +99,11 @@ userSchema.methods.jwtRefreshTokenCreation = async function () {
 
 //   return forgotToken;
 // };
-const User = mongoose.model("User", userSchema);
-export default User
+declare interface IUser extends InferSchemaType<typeof userSchema> {
+  verifyPassword(password: string): Promise<boolean>;
+  jwtAccessTokenCreation(): string;
+  jwtRefreshTokenCreation(): string;
+}
+
+const User = mongoose.model<IUser>("User", userSchema);
+export default User;
